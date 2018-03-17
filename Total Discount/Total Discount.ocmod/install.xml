@@ -1,0 +1,76 @@
+<!--
+ * EXTENSA
+ *
+ * Total discount for Opencart OpenCart 3.0.x
+ *
+ * @author    EXTENSA <info@extensadev.com>
+ * @copyright Copyright (c) 2009-2017, Extensa Web Development OOD (http://extensadev.com/) All rights reserved.
+ * @license   http://extensadev.com/licenses/LICENSE-EULA-extensions-en.txt EXTENSA Commercial Software License (EULA)
+ * @package   EXTENSA\Magento extensions\Total_discount
+ * @link      http://extensadev.com/
+ * @version   GIT: $Id$
+ * @CID       $ClientID$
+-->
+<modification>
+	<name>Total Discount</name>
+	<code>extensa_total_discount</code>
+	<version>2.0.0 for OpenCart 3.0.x</version>
+	<author>Extensa Web Development</author>
+	<link>http://extensadev.com</link>
+
+	<file path="catalog/controller/checkout/confirm.php">
+		<operation>
+			<search><![CDATA[$taxes = $this->cart->getTaxes();]]></search>
+			<add position="replace"><![CDATA[$taxes = array();]]></add>
+		</operation>
+	</file>
+
+	<file path="catalog/model/total/tax.php">
+		<operation>
+			<search><![CDATA[foreach ($total['taxes'] as $key => $value) {]]></search>
+			<add position="replace"><![CDATA[$taxes = $this->cart->getTaxesData($total['total']);
+		$sub_tax_sort_order = 0.01; 
+		foreach ($taxes as $key => $tax) {
+			if ($tax['rate'] > 0) {
+				if($tax['type'] == 'P') {
+					$value = (float)$total['total'] / 100 * $tax['rate'];
+					$total['total'] += (float)$value;
+
+				} elseif($tax['type'] == 'F') {
+					$value = (float)$tax['rate'];
+					$total['total'] += (float)$tax['rate'];
+				}
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA['sort_order' => $this->config->get('tax_sort_order')]]></search>
+			<add position="replace"><![CDATA['sort_order' => $this->config->get('tax_sort_order') + $sub_tax_sort_order]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[$total['total'] += $value;]]></search>
+			<add position="replace"><![CDATA[$sub_tax_sort_order += 0.01;]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[if ($value > 0) {]]></search>
+			<add position="replace"><![CDATA[]]></add>
+		</operation>
+	</file>
+	<file path="system/library/cart/cart.php">
+		<operation>
+			<search><![CDATA[
+public function getTotal() {
+			]]></search>
+			<add position="before"><![CDATA[
+public function getTaxesData($total) {
+		$tax_rates = array();
+		
+		foreach ($this->getProducts() as $product) {
+			if ($product['tax_class_id']) {
+				$tax_rates = $this->tax->getRates($total, $product['tax_class_id']);
+			}
+		}
+		return $tax_rates;
+	}	]]></add>
+		</operation>
+	</file>
+</modification>
