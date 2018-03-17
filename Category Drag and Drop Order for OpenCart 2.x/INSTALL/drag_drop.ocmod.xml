@@ -1,0 +1,266 @@
+<modification>
+	<name>Category Drag and Drop Order for OpenCart 2.x</name>
+	<code>extensa_category_drag_and_drop_order</code>
+	<version>1.0.0</version>
+	<author>EXTENSA (www.extensadev.com)</author>
+	<link>http://extensadev.com</link>
+
+	<file path="admin/controller/catalog/category.php">
+		<operation>
+			<search><![CDATA[
+		$data['repair'] = $this->url->link('catalog/category/repair', 'token=' . $this->session->data['token'] . $url, 'SSL');
+			]]></search>
+			<add position="after"><![CDATA[
+		$data['token'] = $this->session->data['token'];	
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+		$results = $this->model_catalog_category->getCategories($filter_data);
+			]]></search>
+			<add position="replace"><![CDATA[
+		$results = $this->model_catalog_category->getCategoriesByParentId(0);
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+		$data['categories'][] = array( 
+			]]></search>
+			<add position="replace"><![CDATA[
+		$data['categories'][] = $this->getCategoriesTree($result, $url); /*
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+		'delete'      => $this->url->link('catalog/category/delete', 'token=' . $this->session->data['token'] . '&category_id=' . $result['category_id'] . $url, 'SSL')
+			]]></search>
+			<add position="after" offset="1"><![CDATA[
+		*/
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+		array_multisort($sort_order, SORT_ASC, $json);
+			]]></search>
+			<add position="after"><![CDATA[
+		$this->response->addHeader('Content-Type: application/json');
+		$this->response->setOutput(json_encode($json));
+	}
+
+	public function getCategoriesTree($category, $url) {
+		$this->load->model('catalog/category');
+
+		$category_data = array(
+			'category_id' => $category['category_id'],
+			'parent_id'   => $category['parent_id'],
+			'name'        => $category['name'],
+			'sort_order'  => $category['sort_order'],
+			'edit'        => $this->url->link('catalog/category/edit', 'token=' . $this->session->data['token'] . '&category_id=' . $category['category_id'] . $url, 'SSL'),
+			'delete'      => $this->url->link('catalog/category/delete', 'token=' . $this->session->data['token'] . '&category_id=' . $category['category_id'] . $url, 'SSL'),
+			'children'    => array(),
+		);
+
+		if ($subcategories = $this->model_catalog_category->getCategoriesByParentId($category['category_id'])) {
+			foreach ($subcategories as $category) {
+				$category_data['children'][] = $this->getCategoriesTree($category, $url);
+			}
+		}
+
+		return $category_data;
+	}
+
+	public function updateCategoriesPositions() {
+		$json = array();
+
+		$this->load->model('catalog/category');
+
+		if (!empty($this->request->post['category_positions'])) {
+			$n = 1;
+			$json['new_category_positions'] = array();
+			foreach ($this->request->post['category_positions'] as $category_id => $old_sort_order) {
+				$this->model_catalog_category->updateCategoryPosition($category_id, $n);
+
+				$json['new_category_positions'][] = array(
+					'category_id'   => $category_id,
+					'sort_order'    => $n
+				);
+
+				$n++;
+			}
+			$json['success'] = true;
+		}
+			]]></add>
+		</operation>
+	</file>
+	<file path="admin/model/catalog/category.php">
+		<operation>
+			<search><![CDATA[
+				public function getCategories($data = array()) {			
+			]]></search>
+			<add position="before"><![CDATA[
+				public function getCategoriesByParentId($parent_id = 0) {
+					$sql = "SELECT cp.category_id AS category_id, cd.name, c.parent_id, c.sort_order FROM " . DB_PREFIX . "category_path cp LEFT JOIN " . DB_PREFIX . "category c ON (cp.category_id = c.category_id) LEFT JOIN " . DB_PREFIX . "category_description cd ON c.category_id = cd.category_id WHERE c.parent_id = '" . (int)$parent_id . "' AND cd.language_id = '" . (int)$this->config->get('config_language_id') . "' GROUP BY cp.category_id ORDER BY c.sort_order, LCASE(cd.name)";
+
+					$query = $this->db->query($sql);
+
+					return $query->rows;
+				}
+				
+				public function updateCategoryPosition($category_id, $sort_order) {
+					$sql = "UPDATE " . DB_PREFIX . "category SET sort_order = '" . (int)$sort_order . "' WHERE category_id = '" . (int)$category_id . "'";
+
+					$this->db->query($sql);
+				}	
+			]]></add>
+		</operation>	
+	</file>
+	<file path="admin/view/template/catalog/category_list.tpl">
+		<operation>
+			<search><![CDATA[
+      <tbody>
+			]]></search>
+			<add position="replace"><![CDATA[
+	  <tbody class="sortable">
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+              <thead>
+			]]></search>
+			<add position="after"><![CDATA[
+		     <!--
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+              </thead>
+			]]></search>
+			<add position="before"><![CDATA[
+				-->
+                <tr>
+                  <td style="width: 1px;" class="text-center"></td>
+                  <td style="width: 1px;" class="text-center"><?php echo $column_sort_order; ?></td>
+                  <td class="text-left">
+                    <?php echo $column_name; ?>
+                    <span style="float:right;"><?php echo $column_action; ?></span>
+                  </td>
+                </tr>
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+		<?php if ($categories) { ?>
+			]]></search>
+			<add position="after"><![CDATA[
+		     <!--
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+<td class="text-center" colspan="4"><?php echo $text_no_results; ?></td>
+			]]></search>
+			<add position="before" offset='2'><![CDATA[
+--><?php renderCategories($categories, $selected, $button_edit, $column_sort_order, $column_name, $column_action); ?>
+			]]></add>
+		</operation>	
+		<operation>
+			<search><![CDATA[
+		<div class="col-sm-6 text-left"><?php echo $pagination; ?></div>
+			]]></search>
+			<add position="before" offset="1"><![CDATA[
+		     <!--
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+        <div class="col-sm-6 text-right"><?php echo $results; ?></div>
+			]]></search>
+			<add position="after" offset="1"><![CDATA[
+		     -->
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[
+        <?php echo $footer; ?>
+			]]></search>
+			<add position="before"><![CDATA[
+<?php function renderCategories($categories, $selected, $button_edit, $column_sort_order, $column_name, $column_action) { ?>
+    <?php foreach ($categories as $category) { ?>
+      <tr class="ui-state-default">
+        <td class="text-center" style="width: 1px;vertical-align: top;"><?php if (in_array($category['category_id'], $selected)) { ?>
+            <input type="checkbox" name="selected[]" value="<?php echo $category['category_id']; ?>" checked="checked" />
+            <?php } else { ?>
+            <input type="checkbox" name="selected[]" value="<?php echo $category['category_id']; ?>" />
+            <?php } ?></td>
+        <td class="text-center" style="width: 1px;vertical-align: top;">
+			<span id="sort_order_<?php echo $category['category_id']; ?>"><?php echo $category['sort_order']; ?></span><input type="hidden" class="category_positions" name="category_positions[<?php echo $category['category_id']; ?>]" value="<?php echo $category['sort_order']; ?>" /></td>
+        <td class="text-left">
+          <?php echo $category['name']; ?>
+          <a style="float:right;" href="<?php echo $category['edit']; ?>" data-toggle="tooltip" title="<?php echo $button_edit; ?>" class="btn btn-primary"><i class="fa fa-pencil"></i></a>
+          <?php if (!empty($category['children'])) { ?>
+            <br />
+            <br />
+            <br />
+            <table class="table table-bordered table-hover">
+              <thead>
+                <tr>
+                  <td style="width: 1px;" class="text-center"></td>
+                  <td style="width: 1px;" class="text-center"><?php echo $column_sort_order; ?></td>
+                  <td class="text-left">
+                    <?php echo $column_name; ?>
+                    <span style="float:right;"><?php echo $column_action; ?></span>
+                  </td>
+                </tr>
+              </thead>
+              <tbody class="sortable">
+                <?php renderCategories($category['children'], $selected, $button_edit, $column_sort_order, $column_name, $column_action); ?>
+              </thead>
+            </table>
+          <?php } ?>
+        </td>
+      </tr>
+    <?php } ?>
+<?php } ?>
+
+<style>
+.ui-sortable-handle {
+    margin-left: 20px;
+}
+.ui-sortable-placeholder {
+    border: 1px solid red;
+}
+</style>
+
+
+<script type="text/javascript" src="view/javascript/jquery-ui-1.12.0/jquery-ui.min.js"></script>
+
+<script>
+$(document).ready(function () {
+	$( ".sortable" ).sortable({
+		axis: "y",
+		items: "> tr",
+		cursor: "move",
+		stop: function (event, ui) {
+			$.ajax({
+				url: 'index.php?route=catalog/category/updateCategoriesPositions&token=<?php echo $token; ?>',
+				method : 'post',
+				dataType: 'json',
+				data: ui.item.parent().find('> tr > td > .category_positions').serialize(),
+				success: function(json) {
+					if (json.success && json.new_category_positions) {
+						for( i = 0; i < json.new_category_positions.length; i++ ) {
+							if ($('#sort_order_'+json.new_category_positions[i]['category_id']).length != 0) {
+								$('#sort_order_'+json.new_category_positions[i]['category_id']).text(json.new_category_positions[i]['sort_order']);
+							}
+						}
+					}
+				}
+			});
+		}
+	});
+});
+</script>
+			]]></add>
+		</operation>		
+	</file>
+</modification>
